@@ -855,3 +855,9 @@ Request/Response 방식으로 구현하지 않았기 때문에 서비스가 더�
         **/
     }
 ```
+
+
+
+
+
+![image](https://user-images.githubusercontent.com/66341540/100953402-e37c5280-3555-11eb-9c05-d7009e60936f.png)
