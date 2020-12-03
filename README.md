@@ -50,7 +50,7 @@
 1. 성능
     1. 고객이 마이페이지에서 주문 및 배송 상태를 확인할 수 있어야 한다  CQRS
     1. 주문상태가 바뀔때마다 메일 등으로 알림을 줄 수 있어야 한다  Event driven
-![image](https://user-images.githubusercontent.com/66341540/100956395-b763d000-355b-11eb-946d-1157cf5ba00e.png)
+
 
 
 # 체크포인트
@@ -161,7 +161,7 @@
 
 ### 완성된 1차 모형
 
-![image](https://user-images.githubusercontent.com/487999/79683646-63bfa300-8266-11ea-9bc5-c0b650507ac8.png)
+![image](https://user-images.githubusercontent.com/66341540/100956395-b763d000-355b-11eb-946d-1157cf5ba00e.png)
 
     - View Model 추가
 
