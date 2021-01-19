@@ -357,6 +357,9 @@ http PATCH http://order:8080/orders/2 status="Delivery Cancelled"   #Success
 
 ```
 
+![배송서비스stop한상태](https://user-images.githubusercontent.com/66341540/105003606-35c9f200-5a76-11eb-8e06-5595b19d4c38.JPG)
+
+
 ![배송서비스active한상태](https://user-images.githubusercontent.com/66341540/105001947-dff44a80-5a73-11eb-9140-fc8aa9725aaa.JPG)
 
 
