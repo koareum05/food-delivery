@@ -345,21 +345,18 @@ public interface CancellationService {
 ```
 # 배송 (delivery) 서비스를 잠시 내려놓음 (ctrl+c)
 
-#주문처리
-http localhost:8081/orders item=통닭 storeId=1   #Fail
-http localhost:8081/orders item=피자 storeId=2   #Fail
+#주문취소처리
+http PATCH http://order:8080/orders/2 status="Delivery Cancelled"   #Fail
 
-#결제서비스 재기동
-cd 결제
+#배송서비스 재기동
+cd delivery
 mvn spring-boot:run
 
-#주문처리
-http localhost:8081/orders item=통닭 storeId=1   #Success
-http localhost:8081/orders item=피자 storeId=2   #Success
+#주문취소처리
+http PATCH http://order:8080/orders/2 status="Delivery Cancelled"   #Success
 ```
 
 - 또한 과도한 요청시에 서비스 장애가 도미노 처럼 벌어질 수 있다. (서킷브레이커, 폴백 처리는 운영단계에서 설명한다.)
-
 
 
 
