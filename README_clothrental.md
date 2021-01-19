@@ -552,18 +552,20 @@ http http://customercenter:8080/mypages     # 모든 주문의 목록이 조회�
 ## CI/CD 설정
 
 
-각 구현체들은 각자의 source repository 에 구성되었고, 사용한 CI/CD 플랫폼은 GCP를 사용하였으며, pipeline build script 는 각 프로젝트 폴더 이하에 cloudbuild.yml 에 포함되었다.
-
 
 ## 동기식 호출 / 서킷 브레이킹 / 장애격리
 
 * 서킷 브레이킹 프레임워크의 선택: Spring FeignClient + Hystrix 옵션을 사용하여 구현함
 
-시나리오는 단말앱(app)-->결제(pay) 시의 연결을 RESTful Request/Response 로 연동하여 구현이 되어있고, 결제 요청이 과도할 경우 CB 를 통하여 장애격리.
+시나리오는 주문(order)-->배송취소(delivery) 시의 연결을 RESTful Request/Response 로 연동하여 구현이 되어있고, 결제 요청이 과도할 경우 CB 를 통하여 장애격리.
 
 - Hystrix 를 설정:  요청처리 쓰레드에서 처리시간이 610 밀리가 넘어서기 시작하여 어느정도 유지되면 CB 회로가 닫히도록 (요청을 빠르게 실패처리, 차단) 설정
 ```
 # application.yml
+
+feign:
+  hystrix:
+    enabled: true
 
 hystrix:
   command:
@@ -573,7 +575,7 @@ hystrix:
 
 ```
 
-- 피호출 서비스(결제:pay) 의 임의 부하 처리 - 400 밀리에서 증감 220 밀리 정도 왔다갔다 하게
+- 피호출 서비스(배송:cancellation) 의 임의 부하 처리 - 500 밀리에서 증감 220 밀리 정도 왔다갔다 하게, Thread.currentThread().sleep((long) (500 + Math.random() * 220));
 ```
 # (pay) 결제이력.java (Entity)
 
