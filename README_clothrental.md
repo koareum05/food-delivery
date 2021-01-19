@@ -117,8 +117,6 @@
  
 ### 비기능 요구사항에 대한 검증
 
-![image](https://user-images.githubusercontent.com/487999/79684184-5c9a9400-826a-11ea-8d87-2ed1e44f4562.png)
-
     - 마이크로 서비스를 넘나드는 시나리오에 대한 트랜잭션 처리
         - 고객 취소시 배송처리:  배송이 취소되지 않은 주문은 취소되지 않는다는 경영자의 오랜 신념(?) 에 따라, ACID 트랜잭션 적용. 주문취소 전 배송취소 처리에 대해서는 Request-Response 방식 처리
         - 나머지 모든 inter-microservice 트랜잭션: 주문, 회수 등 모든 이벤트와 같이 데이터 일관성의 시점이 크리티컬하지 않은 모든 경우가 대부분이라 판단, Eventual Consistency 를 기본으로 채택함.
@@ -660,6 +658,10 @@ kubectl apply -f kubernetes/deployment.yaml
 ![무정지배포_리드니스있는상태](https://user-images.githubusercontent.com/66341540/105007195-049ff080-5a7b-11eb-9795-33fe618dab86.JPG)
 
 배포기간 동안 Availability 가 변화없기 때문에 무정지 재배포가 성공한 것으로 확인됨.
+
+
+
+
 
 
 # 신규 개발 조직의 추가
