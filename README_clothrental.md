@@ -597,18 +597,14 @@ hystrix:
 
 ```
 $ siege -c2 -t5S -v --content-type "application/json" 'http://order:8080/orders/1 PATCH {"status": "Delivery Cancelled"}'
-
-![서킷브레이크결과](https://user-images.githubusercontent.com/66341540/105006247-bb9b6c80-5a79-11eb-9c29-f2b4827269d7.JPG)
-
-![오토스케일결과](https://user-images.githubusercontent.com/66341540/105006359-e5549380-5a79-11eb-8de7-1e2a85d1e2fe.JPG)
 :
 :
 
 ```
-- 운영시스템은 죽지 않고 지속적으로 CB 에 의하여 적절히 회로가 열림과 닫힘이 벌어지면서 자원을 보호하고 있음을 보여줌. 하지만, 63.55% 가 성공하였고, 46%가 실패했다는 것은 고객 사용성에 있어 좋지 않기 때문에 Retry 설정과 동적 Scale out (replica의 자동적 추가,HPA) 을 통하여 시스템을 확장 해주는 후속처리가 필요.
+![서킷브레이크결과](https://user-images.githubusercontent.com/66341540/105006247-bb9b6c80-5a79-11eb-9c29-f2b4827269d7.JPG)
 
-- Retry 의 설정 (istio)
-- Availability 가 높아진 것을 확인 (siege)
+- 운영시스템은 죽지 않고 지속적으로 CB 에 의하여 적절히 회로가 열림과 닫힘이 벌어지면서 자원을 보호하고 있음을 보여줌.
+
 
 ### 오토스케일 아웃
 앞서 CB 는 시스템을 안정되게 운영할 수 있게 해줬지만 사용자의 요청을 100% 받아들여주지 못했기 때문에 이에 대한 보완책으로 자동화된 확장 기능을 적용하고자 한다. 
@@ -616,36 +612,19 @@ $ siege -c2 -t5S -v --content-type "application/json" 'http://order:8080/orders/
 
 - 결제서비스에 대한 replica 를 동적으로 늘려주도록 HPA 를 설정한다. 설정은 CPU 사용량이 15프로를 넘어서면 replica 를 10개까지 늘려준다:
 ```
-kubectl autoscale deploy pay --min=1 --max=10 --cpu-percent=15
+kubectl autoscale deploy order --min=1 --max=10 --cpu-percent=15
 ```
-- CB 에서 했던 방식대로 워크로드를 2분 동안 걸어준다.
+- CB 에서 했던 방식대로 워크로드를 1분 동안 걸어준다.
 ```
-siege -c100 -t120S -r10 --content-type "application/json" 'http://localhost:8081/orders POST {"item": "chicken"}'
+siege -c150 -t60S -v --content-type "application/json" 'http://order:8080/orders/1 PATCH {"status": "Delivery Cancelled"}'
 ```
 - 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다:
 ```
 kubectl get deploy pay -w
 ```
 - 어느정도 시간이 흐른 후 (약 30초) 스케일 아웃이 벌어지는 것을 확인할 수 있다:
-```
-NAME    DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-pay     1         1         1            1           17s
-pay     1         2         1            1           45s
-pay     1         4         1            1           1m
-:
-```
-- siege 의 로그를 보아도 전체적인 성공률이 높아진 것을 확인 할 수 있다. 
-```
-Transactions:		        5078 hits
-Availability:		       92.45 %
-Elapsed time:		       120 secs
-Data transferred:	        0.34 MB
-Response time:		        5.60 secs
-Transaction rate:	       17.15 trans/sec
-Throughput:		        0.01 MB/sec
-Concurrency:		       96.02
-```
 
+![오토스케일결과](https://user-images.githubusercontent.com/66341540/105006359-e5549380-5a79-11eb-8de7-1e2a85d1e2fe.JPG)
 
 ## 무정지 재배포
 
@@ -653,38 +632,21 @@ Concurrency:		       96.02
 
 - seige 로 배포작업 직전에 워크로드를 모니터링 함.
 ```
-siege -c100 -t120S -r10 --content-type "application/json" 'http://localhost:8081/orders POST {"item": "chicken"}'
-
-** SIEGE 4.0.5
-** Preparing 100 concurrent users for battle.
-The server is now under siege...
-
-HTTP/1.1 201     0.68 secs:     207 bytes ==> POST http://localhost:8081/orders
-HTTP/1.1 201     0.68 secs:     207 bytes ==> POST http://localhost:8081/orders
-HTTP/1.1 201     0.70 secs:     207 bytes ==> POST http://localhost:8081/orders
-HTTP/1.1 201     0.70 secs:     207 bytes ==> POST http://localhost:8081/orders
-:
+siege -c2 -t60S -v --content-type "application/json" 'http://delivery:8080/cancellations POST {"productId": "1001", "qty":5}'
 
 ```
 
 - 새버전으로의 배포 시작
 ```
-kubectl set image ...
+kubectl set image deployment/delivery delivery=clothrentalt.azurecr.io/delivery:latest --record
 ```
 
 - seige 의 화면으로 넘어가서 Availability 가 100% 미만으로 떨어졌는지 확인
-```
-Transactions:		        3078 hits
-Availability:		       70.45 %
-Elapsed time:		       120 secs
-Data transferred:	        0.34 MB
-Response time:		        5.60 secs
-Transaction rate:	       17.15 trans/sec
-Throughput:		        0.01 MB/sec
-Concurrency:		       96.02
 
-```
-배포기간중 Availability 가 평소 100%에서 70% 대로 떨어지는 것을 확인. 원인은 쿠버네티스가 성급하게 새로 올려진 서비스를 READY 상태로 인식하여 서비스 유입을 진행한 것이기 때문. 이를 막기위해 Readiness Probe 를 설정함:
+![무정지배포_리드니스없는상태](https://user-images.githubusercontent.com/66341540/105007085-e4703180-5a7a-11eb-83c9-1369166503fb.JPG)
+
+
+배포기간중 Availability 가 평소 100%에서 2.75% 대로 떨어지는 것을 확인. 원인은 쿠버네티스가 성급하게 새로 올려진 서비스를 READY 상태로 인식하여 서비스 유입을 진행한 것이기 때문. 이를 막기위해 Readiness Probe 를 설정함:
 
 ```
 # deployment.yaml 의 readiness probe 의 설정:
@@ -694,17 +656,8 @@ kubectl apply -f kubernetes/deployment.yaml
 ```
 
 - 동일한 시나리오로 재배포 한 후 Availability 확인:
-```
-Transactions:		        3078 hits
-Availability:		       100 %
-Elapsed time:		       120 secs
-Data transferred:	        0.34 MB
-Response time:		        5.60 secs
-Transaction rate:	       17.15 trans/sec
-Throughput:		        0.01 MB/sec
-Concurrency:		       96.02
 
-```
+![무정지배포_리드니스있는상태](https://user-images.githubusercontent.com/66341540/105007195-049ff080-5a7b-11eb-9795-33fe618dab86.JPG)
 
 배포기간 동안 Availability 가 변화없기 때문에 무정지 재배포가 성공한 것으로 확인됨.
 
