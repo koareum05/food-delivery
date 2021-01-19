@@ -465,6 +465,53 @@ public class PolicyHandler{
     }
 
 ```
+배송은 주문과 분리되어있으며, 이벤트 수신에 따라 처리되기 때문에, 배송 시스템이 유지보수로 인해 잠시 내려간 상태라도 주문을 받는데 문제가 없다:
+  
+```
+package clothrental;
+
+import javax.persistence.*;
+import org.springframework.beans.BeanUtils;
+import java.util.List;
+
+@Entity
+@Table(name="Delivery_table")
+public class Delivery {
+
+    @Id
+    @GeneratedValue(strategy=GenerationType.AUTO)
+    private Long id;
+    private Long orderId;
+    private String status;
+
+    @PostPersist
+    public void onPostPersist(){
+        Shipped shipped = new Shipped();
+        BeanUtils.copyProperties(this, shipped);
+        shipped.publishAfterCommit();
+
+
+    }
+
+```
+```
+# 배송 서비스 (Delivery) 를 잠시 내려놓음 (ctrl+c)
+
+#주문처리
+http http://order:8080/orders productId=1001 qty=5 status=Order   #Success
+
+#배송목록 확인
+http http://delivery:8080/deliveries    # 배송 목록이 조회안됨
+
+#배송 서비스 기동
+cd delivery
+mvn spring-boot:run
+
+#배송목록 확인
+http http://delivery:8080/deliveries     # 모든 주문의 목록이 조회됨
+```
+
+```
 고객센터는 주문/배송과 완전히 분리되어있으며, 이벤트 수신에 따라 처리되기 때문에, 고객센터 시스템이 유지보수로 인해 잠시 내려간 상태라도 주문을 받는데 문제가 없다:
   
 ```
