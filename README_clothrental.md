@@ -628,6 +628,15 @@ kubectl get deploy order -w
 
 * 먼저 무정지 재배포가 100% 되는 것인지 확인하기 위해서 Autoscaler 이나 CB 설정을 제거함
 
+order 에 deployment.yaml 
+```
+          resources:
+            limits:
+              cpu: 500m
+            requests:
+              cpu: 200m
+```
+
 - seige 로 배포작업 직전에 워크로드를 모니터링 함.
 ```
 siege -c2 -t60S -v --content-type "application/json" 'http://delivery:8080/cancellations POST {"productId": "1001", "qty":5}'
