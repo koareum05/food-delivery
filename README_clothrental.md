@@ -355,7 +355,9 @@ mvn spring-boot:run
 #주문취소처리
 http PATCH http://order:8080/orders/2 status="Delivery Cancelled"   #Success
 
-![배송서비스active한상태](https://user-images.githubusercontent.com/66341540/105001622-665c5c80-5a73-11eb-8453-48228f723950.JPG)
+
+![배송서비스active한상태](https://user-images.githubusercontent.com/66341540/105001947-dff44a80-5a73-11eb-9140-fc8aa9725aaa.JPG)
+
 
 ```
 
