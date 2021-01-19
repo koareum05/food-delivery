@@ -354,7 +354,11 @@ mvn spring-boot:run
 
 #주문취소처리
 http PATCH http://order:8080/orders/2 status="Delivery Cancelled"   #Success
+
+![배송서비스active한상태](https://user-images.githubusercontent.com/66341540/105001622-665c5c80-5a73-11eb-8453-48228f723950.JPG)
+
 ```
+
 
 - 또한 과도한 요청시에 서비스 장애가 도미노 처럼 벌어질 수 있다. (서킷브레이커, 폴백 처리는 운영단계에서 설명한다.)
 
