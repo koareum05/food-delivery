@@ -370,48 +370,99 @@ http PATCH http://order:8080/orders/2 status="Delivery Cancelled"   #Success
 ## 비동기식 호출 / 시간적 디커플링 / 장애격리 / 최종 (Eventual) 일관성 테스트
 
 
-결제가 이루어진 후에 상점시스템으로 이를 알려주는 행위는 동기식이 아니라 비 동기식으로 처리하여 상점 시스템의 처리를 위하여 결제주문이 블로킹 되지 않아도록 처리한다.
+주문이 이루어진 후에 배송시스템으로 이를 알려주는 행위는 동기식이 아니라 비 동기식으로 처리하여 배송 시스템의 처리를 위하여 주문이 블로킹 되지 않아도록 처리한다.
  
-- 이를 위하여 결제이력에 기록을 남긴 후에 곧바로 결제승인이 되었다는 도메인 이벤트를 카프카로 송출한다(Publish)
+- 이를 위하여 주문이력에 기록을 남긴 후에 곧바로 배송이 시작되었다는 도메인 이벤트를 카프카로 송출한다(Publish)
  
 ```
-package fooddelivery;
+package clothrental;
+
+import javax.persistence.*;
+
+import com.esotericsoftware.kryo.util.IntArray;
+import org.springframework.beans.BeanUtils;
+import java.util.List;
+import java.util.Objects;
 
 @Entity
-@Table(name="결제이력_table")
-public class 결제이력 {
+@Table(name="Order_table")
+public class Order {
 
- ...
-    @PrePersist
-    public void onPrePersist(){
-        결제승인됨 결제승인됨 = new 결제승인됨();
-        BeanUtils.copyProperties(this, 결제승인됨);
-        결제승인됨.publish();
+    @Id
+    @GeneratedValue(strategy=GenerationType.AUTO)
+    private Long id;
+    private String productId;
+    private Integer qty;
+    private String status;
+
+    @PostPersist
+    public void onPostPersist(){
+        Order order = new Order();
+        order.setStatus(order.getStatus());
+        System.out.println("##### Status : " + order.getStatus());
+
+        if (Objects.equals(status, "Order")) {
+
+            Ordered ordered = new Ordered();
+            BeanUtils.copyProperties(this, ordered);
+            ordered.publishAfterCommit();
+        }
+        if (Objects.equals(status, "Return")){
+
+            Returned returned = new Returned();
+            BeanUtils.copyProperties(this, returned);
+            returned.publishAfterCommit();
+        }
+
     }
-
-}
 ```
-- 상점 서비스에서는 결제승인 이벤트에 대해서 이를 수신하여 자신의 정책을 처리하도록 PolicyHandler 를 구현한다:
+
+- 배송 서비스에서는 배송 이벤트에 대해서 이를 수신하여 자신의 정책을 처리하도록 PolicyHandler 를 구현한다:
 
 ```
-package fooddelivery;
+package clothrental;
 
 ...
 
 @Service
 public class PolicyHandler{
+    @StreamListener(KafkaProcessor.INPUT)
+    public void onStringEventListener(@Payload String eventString){
+
+    }
+
+    @Autowired
+    DeliveryRepository deliveryRepository;
 
     @StreamListener(KafkaProcessor.INPUT)
-    public void whenever결제승인됨_주문정보받음(@Payload 결제승인됨 결제승인됨){
+    public void wheneverOrdered_Ship(@Payload Ordered ordered){
 
-        if(결제승인됨.isMe()){
-            System.out.println("##### listener 주문정보받음 : " + 결제승인됨.toJson());
-            // 주문 정보를 받았으니, 요리를 슬슬 시작해야지..
-            
+        if(ordered.isMe()){
+            // To-Do : SMS발송, CJ Logistics 연계, ...
+            Delivery delivery = new Delivery();
+            delivery.setOrderId(ordered.getId());
+            delivery.setStatus("Delivery Started");
+
+            deliveryRepository.save(delivery);
+
+            System.out.println("##### listener Ship : " + ordered.toJson());
         }
     }
 
-}
+    @StreamListener(KafkaProcessor.INPUT)
+    public void wheneverOrdered_Ship(@Payload Returned returned){
+
+        if(returned.isMe()){
+            // To-Do : SMS발송, CJ Logistics 연계, ...
+            Delivery delivery = new Delivery();
+            delivery.setOrderId(returned.getId());
+            delivery.setStatus("Return Started");
+
+            deliveryRepository.save(delivery);
+
+            System.out.println("##### listener Ship : " + returned.toJson());
+        }
+    }
 
 ```
 실제 구현을 하자면, 카톡 등으로 점주는 노티를 받고, 요리를 마친후, 주문 상태를 UI에 입력할테니, 우선 주문정보를 DB에 받아놓은 후, 이후 처리는 해당 Aggregate 내에서 하면 되겠다.:
