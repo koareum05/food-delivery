@@ -32,15 +32,22 @@
 1. 고객이 주문상태를 중간중간 조회한다
 1. 주문상태가 바뀔 때 마다 메일로 알림을 보낸다
 
+1. 고객이 세탁 요청한다
+1. 세탁 접수되면 세탁 내역이 세탁팀에게 전달된다
+1. 세탁취소 전에만 고객이 세탁을 취소할 수 있다
+1. 세탁이 취소되면 세탁 주문이 취소된다
+
 비기능적 요구사항
 1. 트랜잭션
     1. 고객의 주문 취소는 반드시 배송팀 배송취소가 전제되어야 한다  Sync 호출 
+    2. 고객의 세탁 취소는 반드시 세탁팀 세탁취소가 전제되어야 한다  Sync 호출
 1. 장애격리
     1. 배송관리 기능이 수행되지 않더라도 주문은 365일 24시간 받을 수 있어야 한다  Async (event-driven), Eventual Consistency
     1. 배송이 과중되면 배송을 잠시동안 받지 않고 잠시후에 배송 처리 하도록 유도한다  Circuit breaker, fallback
+    1. 세탁관리 기능이 수행되지 않더라도 세탁 주문은 365일 24시간 받을 수 있어야 한다  Async (event-driven), Eventual Consistency
+    1. 세탁이 과중되면 세탁 요청을 잠시동안 받지 않고 잠시후에 세탁 처리 하도록 유도한다  Circuit breaker, fallback
 1. 성능
     1. 고객이 마이페이지에서 주문 및 배송 상태를 확인할 수 있어야 한다  CQRS
-    1. 주문상태가 바뀔때마다 메일 등으로 알림을 줄 수 있어야 한다  Event driven
 
 
 
@@ -112,13 +119,14 @@
 
 ### 완성된 모형
 
-![image](https://user-images.githubusercontent.com/66341540/100956395-b763d000-355b-11eb-946d-1157cf5ba00e.png)
+![개별과제모델링](https://user-images.githubusercontent.com/66341540/105129130-c0b6f500-5b27-11eb-965e-06897ce3d1b7.JPG)
 
  
 ### 비기능 요구사항에 대한 검증
 
     - 마이크로 서비스를 넘나드는 시나리오에 대한 트랜잭션 처리
         - 고객 취소시 배송처리:  배송이 취소되지 않은 주문은 취소되지 않는다는 경영자의 오랜 신념(?) 에 따라, ACID 트랜잭션 적용. 주문취소 전 배송취소 처리에 대해서는 Request-Response 방식 처리
+        - 고객 세탁 취소시 세탁소 취소 처리: 세탁소에서 취소되지 않은 주문은 세탁 요청 취소되지 않는다는 경영자의 오랜 신념(?) 에 따라, ACID 트랜잭션 적용. 세탁주문취소 전 세탁소 취소 처리에 대해서는 Request-Response 방식 처리
         - 나머지 모든 inter-microservice 트랜잭션: 주문, 회수 등 모든 이벤트와 같이 데이터 일관성의 시점이 크리티컬하지 않은 모든 경우가 대부분이라 판단, Eventual Consistency 를 기본으로 채택함.
 
 
@@ -138,6 +146,9 @@ cd customercenter
 mvn spring-boot:run  
 
 cd gateway
+mvn spring-boot:run
+
+cd laundry
 mvn spring-boot:run 
 ```
 
@@ -149,83 +160,18 @@ mvn spring-boot:run
 package clothrental;
 
 import javax.persistence.*;
-
-import com.esotericsoftware.kryo.util.IntArray;
 import org.springframework.beans.BeanUtils;
 import java.util.List;
-import java.util.Objects;
 
 @Entity
-@Table(name="Order_table")
-public class Order {
+@Table(name="Laundry_table")
+public class Laundry {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
-    private String productId;
-    private Integer qty;
+    private Long orderId;
     private String status;
-
-    @PostPersist
-    public void onPostPersist(){
-        Order order = new Order();
-        order.setStatus(order.getStatus());
-        System.out.println("##### Status : " + order.getStatus());
-
-        if (Objects.equals(status, "Order")) {
-
-            Ordered ordered = new Ordered();
-            BeanUtils.copyProperties(this, ordered);
-            ordered.publishAfterCommit();
-        }
-        if (Objects.equals(status, "Return")){
-
-            Returned returned = new Returned();
-            BeanUtils.copyProperties(this, returned);
-            returned.publishAfterCommit();
-        }
-
-    }
-
-    @PostUpdate
-    public void onPostUpdate(){
-        System.out.println("################# Order Status Updated and Update Event raised..!!");
-        OrdereCancelled ordereCancelled = new OrdereCancelled();
-        BeanUtils.copyProperties(this, ordereCancelled);
-        ordereCancelled.publishAfterCommit();
-
-        //Following code causes dependency to external APIs
-        // it is NOT A GOOD PRACTICE. instead, Event-Policy mapping is recommended.
-
-        clothrental.external.Cancellation cancellation = new clothrental.external.Cancellation();
-        // mappings goes here
-        // 아래 this는 Order 어그리게이트
-        cancellation.setOrderId(this.getId());
-        cancellation.setStatus("Delivery Cancelled");
-        OrderApplication.applicationContext.getBean(clothrental.external.CancellationService.class)
-                .cancelship(cancellation);
-
-    }
-
-    @PreRemove
-    public void onPreRemove(){
-        OrdereCancelled ordereCancelled = new OrdereCancelled();
-        BeanUtils.copyProperties(this, ordereCancelled);
-        ordereCancelled.publishAfterCommit();
-
-        //Following code causes dependency to external APIs
-        // it is NOT A GOOD PRACTICE. instead, Event-Policy mapping is recommended.
-
-        clothrental.external.Cancellation cancellation = new clothrental.external.Cancellation();
-        // mappings goes here
-        // 아래 this는 Order 어그리게이트
-        cancellation.setOrderId(this.getId());
-        cancellation.setStatus("Delivery Cancelled");
-        OrderApplication.applicationContext.getBean(clothrental.external.CancellationService.class)
-            .cancelship(cancellation);
-
-
-    }
 
 
     public Long getId() {
@@ -235,19 +181,12 @@ public class Order {
     public void setId(Long id) {
         this.id = id;
     }
-    public String getProductId() {
-        return productId;
+    public Long getOrderId() {
+        return orderId;
     }
 
-    public void setProductId(String productId) {
-        this.productId = productId;
-    }
-    public Integer getQty() {
-        return qty;
-    }
-
-    public void setQty(Integer qty) {
-        this.qty = qty;
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
     }
     public String getStatus() {
         return status;
@@ -257,8 +196,10 @@ public class Order {
         this.status = status;
     }
 
-}
 
+
+
+}
 
 ```
 - Entity Pattern 과 Repository Pattern 을 적용하여 JPA 를 통하여 데이터소스 유형에 대한 별도의 처리가 없도록 데이터 접근 어댑터를 자동 생성하기 위하여 Spring Data REST 의 RestRepository 를 적용하였다
@@ -267,12 +208,14 @@ package clothrental;
 
 import org.springframework.data.repository.PagingAndSortingRepository;
 
-public interface OrderRepository extends PagingAndSortingRepository<Order, Long>{
+public interface LaundryRepository extends PagingAndSortingRepository<Laundry, Long>{
+
+
 }
 ```
 - 적용 후 REST API 의 테스트
 ```
-# order 서비스의 주문처리
+# order 서비스의 세탁 요청 처리
 http http://order:8080/orders productId=1001 qty=5 status=Order
 
 # delivery 서비스의 배송취소처리
