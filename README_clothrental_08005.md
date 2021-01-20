@@ -154,7 +154,7 @@ mvn spring-boot:run
 
 ## DDD 의 적용
 
-- 각 서비스내에 도출된 핵심 Aggregate Root 객체를 Entity 로 선언하였다: (예시는 order 마이크로 서비스). 이때 가능한 현업에서 사용하는 언어 (유비쿼터스 랭귀지)를 그대로 사용하려고 노력했다.
+- 각 서비스내에 도출된 핵심 Aggregate Root 객체를 Entity 로 선언하였다: (예시는 Laundry 마이크로 서비스). 이때 가능한 현업에서 사용하는 언어 (유비쿼터스 랭귀지)를 그대로 사용하려고 노력했다.
 
 ```
 package clothrental;
@@ -215,17 +215,25 @@ public interface LaundryRepository extends PagingAndSortingRepository<Laundry, L
 ```
 - 적용 후 REST API 의 테스트
 ```
-# order 서비스의 세탁 요청 처리
-http http://order:8080/orders productId=1001 qty=5 status=Order
+```
 
-# delivery 서비스의 배송취소처리
-http http://delivery:8080/cancellations orderId=1 status="Delivery Cancelled"
-
-# 주문 상태 확인
-http http://20.194.37.221:8080/mypages
-http http://customercenter:8080/mypages
 
 ```
+# order 서비스의 세탁 요청 처리
+```
+![02 pub_sub_세탁서비스중지_Wash수행됨_1](https://user-images.githubusercontent.com/66341540/105147816-0635eb00-5b45-11eb-9519-f70ca9c3fe36.JPG)
+
+```
+# 주문 상태 확인
+```
+![05 pub_sub_세탁서비스수행_LaundryStarted수행됨_1](https://user-images.githubusercontent.com/66341540/105148060-4b5a1d00-5b45-11eb-8ac9-fb7f03c5f760.JPG)
+```
+# 주문 상태 확인
+```
+![06 CQRS적용결과](https://user-images.githubusercontent.com/66341540/105147876-18b02480-5b45-11eb-93fc-6a49b9dc31eb.JPG)
+
+
+
 
 
 ## 동기식 호출 과 Fallback 처리
