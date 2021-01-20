@@ -216,34 +216,31 @@ public interface LaundryRepository extends PagingAndSortingRepository<Laundry, L
 - 적용 후 REST API 의 테스트
 ```
 ```
-
-
 ```
 # order 서비스의 세탁 요청 처리
 ```
 ![02 pub_sub_세탁서비스중지_Wash수행됨_1](https://user-images.githubusercontent.com/66341540/105147816-0635eb00-5b45-11eb-9519-f70ca9c3fe36.JPG)
 
 ```
-# 주문 상태 확인
+# 세탁 서비스의 세탁 시작 상태 확인
 ```
 ![05 pub_sub_세탁서비스수행_LaundryStarted수행됨_1](https://user-images.githubusercontent.com/66341540/105148060-4b5a1d00-5b45-11eb-8ac9-fb7f03c5f760.JPG)
 ```
-# 주문 상태 확인
+# 마이페이지의 세탁 요청 상태 확인
 ```
 ![06 CQRS적용결과](https://user-images.githubusercontent.com/66341540/105147876-18b02480-5b45-11eb-93fc-6a49b9dc31eb.JPG)
 
 
 
-
-
 ## 동기식 호출 과 Fallback 처리
 
-분석단계에서의 조건 중 하나로 주문(order)->배송취소(cancellation) 간의 호출은 동기식 일관성을 유지하는 트랜잭션으로 처리하기로 하였다. 호출 프로토콜은 이미 앞서 Rest Repository 에 의해 노출되어있는 REST 서비스를 FeignClient 를 이용하여 호출하도록 한다. 
+분석단계에서의 조건 중 하나로 주문(order)->세탁취소(washCancellation) 간의 호출은 동기식 일관성을 유지하는 트랜잭션으로 처리하기로 하였다. 호출 프로토콜은 이미 앞서 Rest Repository 에 의해 노출되어있는 REST 서비스를 FeignClient 를 이용하여 호출하도록 한다. 
 
-- 배송서비스를 호출하기 위하여 Stub과 (FeignClient) 를 이용하여 Service 대행 인터페이스 (Proxy) 를 구현 
+- 세탁서비스를 호출하기 위하여 Stub과 (FeignClient) 를 이용하여 Service 대행 인터페이스 (Proxy) 를 구현 
 
 ```
-# (order) CancellationService.java
+# (order) WashCancellationService.java
+
 
 package clothrental.external;
 
@@ -254,37 +251,34 @@ import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.Date;
 
-@FeignClient(name="delivery", url="${api.delivery.url}")
-public interface CancellationService {
+@FeignClient(name="laundry", url="${api.laundry.url}")
+public interface WashCancellationService {
 
-    @RequestMapping(method= RequestMethod.POST, path="/cancellations")
-    public void cancelship(@RequestBody Cancellation cancellation);
+    @RequestMapping(method= RequestMethod.POST, path="/washCancellations")
+    public void cancelwash(@RequestBody WashCancellation WashCancellation);
 
 }
 ```
 
-- 배송 취소가 되면(@PostUpdate) 주문 취소가 가능하도록 처리
+- 세탁 요청이 취소가 되면(@PostUpdate) 세탁 주문 취소가 가능하도록 처리
 ```
 # Order.java (Entity)
-
     @PostUpdate
     public void onPostUpdate(){
-        System.out.println("################# Order Status Updated and Update Event raised..!!");
-        OrdereCancelled ordereCancelled = new OrdereCancelled();
-        BeanUtils.copyProperties(this, ordereCancelled);
-        ordereCancelled.publishAfterCommit();
+        WashCancelled washCancelled = new WashCancelled();
+            BeanUtils.copyProperties(this, washCancelled);
+            washCancelled.publishAfterCommit();
 
         //Following code causes dependency to external APIs
         // it is NOT A GOOD PRACTICE. instead, Event-Policy mapping is recommended.
 
-        clothrental.external.Cancellation cancellation = new clothrental.external.Cancellation();
+        clothrental.external.WashCancellation washCancellation = new clothrental.external.WashCancellation();
         // mappings goes here
         // 아래 this는 Order 어그리게이트
-        cancellation.setOrderId(this.getId());
-        cancellation.setStatus("Delivery Cancelled");
-        OrderApplication.applicationContext.getBean(clothrental.external.CancellationService.class)
-                .cancelship(cancellation);
-
+            washCancellation.setOrderId(this.getId());
+            washCancellation.setStatus("Laundry Cancelled");
+            OrderApplication.applicationContext.getBean(clothrental.external.WashCancellationService.class)
+                .cancelwash(washCancellation);
     }
 ```
 
@@ -292,28 +286,26 @@ public interface CancellationService {
 
 
 ```
-# 배송 (delivery) 서비스를 잠시 내려놓음 (ctrl+c)
+# 세탁 (laundry) 서비스를 잠시 내려놓음 (ctrl+c)
 
-#주문취소처리
-http PATCH http://order:8080/orders/2 status="Delivery Cancelled"   #Fail
-
-#배송서비스 재기동
-cd delivery
-mvn spring-boot:run
-
-#주문취소처리
-http PATCH http://order:8080/orders/2 status="Delivery Cancelled"   #Success
+#주문취소처리 #Fail
+```
+![03 req_res_세탁서비스중지_order_삭제안됨_1](https://user-images.githubusercontent.com/66341540/105161973-5a48cb80-5b55-11eb-86b8-f8d09b28722c.JPG)
 
 ```
+#세탁서비스 재기동
+cd delivery
+mvn spring-boot:run
+```
 
-![배송서비스stop한상태](https://user-images.githubusercontent.com/66341540/105003606-35c9f200-5a76-11eb-8e06-5595b19d4c38.JPG)
+```
+#주문취소처리 #Success
 
-
-![배송서비스active한상태](https://user-images.githubusercontent.com/66341540/105001947-dff44a80-5a73-11eb-9140-fc8aa9725aaa.JPG)
+```
+![07 req_res_세탁서비스수행_order_삭제됨](https://user-images.githubusercontent.com/66341540/105162201-a3008480-5b55-11eb-989b-30712b7444a8.JPG)
 
 
 - 또한 과도한 요청시에 서비스 장애가 도미노 처럼 벌어질 수 있다. (서킷브레이커, 폴백 처리는 운영단계에서 설명한다.)
-
 
 
 ## 비동기식 호출 / 시간적 디커플링 / 장애격리 / 최종 (Eventual) 일관성 테스트
