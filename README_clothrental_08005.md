@@ -482,7 +482,7 @@ public interface MypageRepository extends CrudRepository<Mypage, Long> {
 
 * 서킷 브레이킹 프레임워크의 선택: Spring FeignClient + Hystrix 옵션을 사용하여 구현함
 
-시나리오는 주문(order)-->배송취소(delivery) 시의 연결을 RESTful Request/Response 로 연동하여 구현이 되어있고, 결제 요청이 과도할 경우 CB 를 통하여 장애격리.
+시나리오는 주문(order)-->세탁취소(laundry) 시의 연결을 RESTful Request/Response 로 연동하여 구현이 되어있고, 결제 요청이 과도할 경우 CB 를 통하여 장애격리.
 
 - Hystrix 를 설정:  요청처리 쓰레드에서 처리시간이 610 밀리가 넘어서기 시작하여 어느정도 유지되면 CB 회로가 닫히도록 (요청을 빠르게 실패처리, 차단) 설정
 ```
@@ -500,13 +500,13 @@ hystrix:
 
 ```
 
-- 피호출 서비스(배송:cancellation) 의 임의 부하 처리 - 500 밀리에서 증감 220 밀리 정도 왔다갔다 하게, Thread.currentThread().sleep((long) (500 + Math.random() * 220));
+- 피호출 서비스(세탁:washCancellation) 의 임의 부하 처리 - 500 밀리에서 증감 220 밀리 정도 왔다갔다 하게, Thread.currentThread().sleep((long) (500 + Math.random() * 220));
 ```
-# (delivery) cancellation.java (Entity)
+# (laundry) Washcancellation.java (Entity)
 
     @PrePersist
     public void onPrePersist(){
-        System.out.println("################# cancellation start");
+        System.out.println("################# wash cancellation start");
 
         try {
             Thread.currentThread().sleep((long) (500 + Math.random() * 220));
@@ -522,12 +522,12 @@ hystrix:
 - 5초 동안 실시
 
 ```
-$ siege -c2 -t5S -v --content-type "application/json" 'http://order:8080/orders/1 PATCH {"status": "Delivery Cancelled"}'
-:
-:
-
+siege -c2 -t5S -v --content-type "application/json" 'http://order:8080/orders/2 PATCH {"status": "Laundry Cancelled"}'
 ```
-![서킷브레이크결과](https://user-images.githubusercontent.com/66341540/105006247-bb9b6c80-5a79-11eb-9c29-f2b4827269d7.JPG)
+![08 서킷브레이크결과_1](https://user-images.githubusercontent.com/66341540/105164254-418de500-5b58-11eb-90a0-0478a3a560b4.JPG)
+
+![08 서킷브레이크결과_2](https://user-images.githubusercontent.com/66341540/105164280-4c487a00-5b58-11eb-8dc7-4672eca05939.JPG)
+
 
 - 운영시스템은 죽지 않고 지속적으로 CB 에 의하여 적절히 회로가 열림과 닫힘이 벌어지면서 자원을 보호하고 있음을 보여줌.
 
@@ -536,21 +536,27 @@ $ siege -c2 -t5S -v --content-type "application/json" 'http://order:8080/orders/
 앞서 CB 는 시스템을 안정되게 운영할 수 있게 해줬지만 사용자의 요청을 100% 받아들여주지 못했기 때문에 이에 대한 보완책으로 자동화된 확장 기능을 적용하고자 한다. 
 
 
-- 결제서비스에 대한 replica 를 동적으로 늘려주도록 HPA 를 설정한다. 설정은 CPU 사용량이 15프로를 넘어서면 replica 를 10개까지 늘려준다:
+- 주문서비스에 대한 replica 를 동적으로 늘려주도록 HPA 를 설정한다. 설정은 CPU 사용량이 15프로를 넘어서면 replica 를 10개까지 늘려준다:
 ```
 kubectl autoscale deploy order --min=1 --max=10 --cpu-percent=15
 ```
-- CB 에서 했던 방식대로 워크로드를 1분 동안 걸어준다.
+- CB 에서 했던 방식대로 워크로드를 10초 동안 걸어준다.
 ```
-siege -c150 -t60S -v --content-type "application/json" 'http://order:8080/orders/1 PATCH {"status": "Delivery Cancelled"}'
+siege -c200 -t10S -v --content-type "application/json" 'http://order:8080/orders/1 PATCH {"status": "Laundry Cancelled"}'
 ```
-- 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다: kubectl get hpa 에 대한 캡처가 필요
+- 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다:
 ```
 kubectl get deploy order -w
+kubectl get hpa
 ```
-- 어느정도 시간이 흐른 후 (약 30초) 스케일 아웃이 벌어지는 것을 확인할 수 있다:
+- 어느정도 시간이 흐른 후 스케일 아웃이 벌어지는 것을 확인할 수 있다:
 
-![오토스케일결과](https://user-images.githubusercontent.com/66341540/105006359-e5549380-5a79-11eb-8de7-1e2a85d1e2fe.JPG)
+![09 오토스케일아웃_시그명령결과](https://user-images.githubusercontent.com/66341540/105164596-a8130300-5b58-11eb-93e7-d2c09de74437.JPG)
+
+![09 오토스케일아웃_pod늘어난결과_get_pod](https://user-images.githubusercontent.com/66341540/105164617-b103d480-5b58-11eb-93d5-7537d130e724.JPG)
+
+![09 오토스케일아웃_HPA결과](https://user-images.githubusercontent.com/66341540/105164636-b6611f00-5b58-11eb-892f-6b7e0af74e69.JPG)
+
 
 ## 무정지 재배포
 
