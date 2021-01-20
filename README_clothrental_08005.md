@@ -294,13 +294,12 @@ public interface WashCancellationService {
 
 ```
 #세탁서비스 재기동
-cd delivery
+cd laundry
 mvn spring-boot:run
 ```
 
 ```
 #주문취소처리 #Success
-
 ```
 ![07 req_res_세탁서비스수행_order_삭제됨](https://user-images.githubusercontent.com/66341540/105162201-a3008480-5b55-11eb-989b-30712b7444a8.JPG)
 
@@ -311,9 +310,9 @@ mvn spring-boot:run
 ## 비동기식 호출 / 시간적 디커플링 / 장애격리 / 최종 (Eventual) 일관성 테스트
 
 
-주문이 이루어진 후에 배송시스템으로 이를 알려주는 행위는 동기식이 아니라 비 동기식으로 처리하여 배송 시스템의 처리를 위하여 주문이 블로킹 되지 않아도록 처리한다.
+세탁 주문이 이루어진 후에 세탁시스템으로 이를 알려주는 행위는 동기식이 아니라 비 동기식으로 처리하여 세탁 시스템의 처리를 위하여 주문이 블로킹 되지 않아도록 처리한다.
  
-- 이를 위하여 주문이력에 기록을 남긴 후에 곧바로 배송이 시작되었다는 도메인 이벤트를 카프카로 송출한다(Publish)
+- 이를 위하여 세탁 주문이력에 기록을 남긴 후에 곧바로 세탁이 시작되었다는 도메인 이벤트를 카프카로 송출한다(Publish)
  
 ```
 package clothrental;
@@ -341,29 +340,29 @@ public class Order {
         Order order = new Order();
         order.setStatus(order.getStatus());
         System.out.println("##### Status : " + order.getStatus());
+        
+        if (Objects.equals(status, "Wash")){
+            Washed washed = new Washed();
+            BeanUtils.copyProperties(this, washed);
+            washed.publishAfterCommit();
 
-        if (Objects.equals(status, "Order")) {
-
-            Ordered ordered = new Ordered();
-            BeanUtils.copyProperties(this, ordered);
-            ordered.publishAfterCommit();
-        }
-        if (Objects.equals(status, "Return")){
-
-            Returned returned = new Returned();
-            BeanUtils.copyProperties(this, returned);
-            returned.publishAfterCommit();
         }
 
     }
 ```
 
-- 배송 서비스에서는 배송 이벤트에 대해서 이를 수신하여 자신의 정책을 처리하도록 PolicyHandler 를 구현한다:
+- 세탁 서비스에서는 세탁 이벤트에 대해서 이를 수신하여 자신의 정책을 처리하도록 PolicyHandler 를 구현한다:
 
 ```
 package clothrental;
 
-...
+import clothrental.config.kafka.KafkaProcessor;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.stream.annotation.StreamListener;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.stereotype.Service;
 
 @Service
 public class PolicyHandler{
@@ -373,40 +372,27 @@ public class PolicyHandler{
     }
 
     @Autowired
-    DeliveryRepository deliveryRepository;
+    LaundryRepository laundryRepository;
 
     @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverOrdered_Ship(@Payload Ordered ordered){
+    public void wheneverWashed_wash(@Payload Washed washed){
 
-        if(ordered.isMe()){
+        if(washed.isMe()) {
             // To-Do : SMS발송, CJ Logistics 연계, ...
-            Delivery delivery = new Delivery();
-            delivery.setOrderId(ordered.getId());
-            delivery.setStatus("Delivery Started");
+            Laundry laundry = new Laundry();
+            laundry.setOrderId(washed.getId());
+            laundry.setStatus("Laundry Started");
 
-            deliveryRepository.save(delivery);
+            laundryRepository.save(laundry);
 
-            System.out.println("##### listener Ship : " + ordered.toJson());
+            System.out.println("##### listener  : " + washed.toJson());
         }
     }
 
-    @StreamListener(KafkaProcessor.INPUT)
-    public void wheneverOrdered_Ship(@Payload Returned returned){
-
-        if(returned.isMe()){
-            // To-Do : SMS발송, CJ Logistics 연계, ...
-            Delivery delivery = new Delivery();
-            delivery.setOrderId(returned.getId());
-            delivery.setStatus("Return Started");
-
-            deliveryRepository.save(delivery);
-
-            System.out.println("##### listener Ship : " + returned.toJson());
-        }
-    }
+}
 
 ```
-배송은 주문과 분리되어있으며, 이벤트 수신에 따라 처리되기 때문에, 배송 시스템이 유지보수로 인해 잠시 내려간 상태라도 주문을 받는데 문제가 없다:
+세탁과 주문과 분리되어있으며, 이벤트 수신에 따라 처리되기 때문에, 세탁 시스템이 유지보수로 인해 잠시 내려간 상태라도 주문을 받는데 문제가 없다:
   
 ```
 package clothrental;
@@ -416,8 +402,8 @@ import org.springframework.beans.BeanUtils;
 import java.util.List;
 
 @Entity
-@Table(name="Delivery_table")
-public class Delivery {
+@Table(name="Laundry_table")
+public class Laundry {
 
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
@@ -425,18 +411,33 @@ public class Delivery {
     private Long orderId;
     private String status;
 
-    @PostPersist
-    public void onPostPersist(){
-        Shipped shipped = new Shipped();
-        BeanUtils.copyProperties(this, shipped);
-        shipped.publishAfterCommit();
 
-
+    public Long getId() {
+        return id;
     }
 
+    public void setId(Long id) {
+        this.id = id;
+    }
+    public Long getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
+    }
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+}
 ```
 ```
-# 배송 서비스 (Delivery) 를 잠시 내려놓음 (ctrl+c)
+# 세탁 서비스 (laundry) 를 잠시 내려놓음 (ctrl+c)
 
 #주문처리
 http http://order:8080/orders productId=1001 qty=5 status=Order   #Success
