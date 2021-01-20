@@ -436,26 +436,25 @@ public class Laundry {
 
 }
 ```
+
 ```
 # 세탁 서비스 (laundry) 를 잠시 내려놓음 (ctrl+c)
+#주문처리 #Success
+#세탁목록 확인 # 세탁 목록이 조회안됨
+```
+![02 pub_sub_세탁서비스중지_Wash수행됨_1](https://user-images.githubusercontent.com/66341540/105163030-b7914c80-5b56-11eb-8fd7-037cfe111a9d.JPG)
 
-#주문처리
-http http://order:8080/orders productId=1001 qty=5 status=Order   #Success
-
-#배송목록 확인
-http http://delivery:8080/deliveries    # 배송 목록이 조회안됨
-
-#배송 서비스 기동
-cd delivery
+```
+#세탁 서비스 기동
+cd laundry
 mvn spring-boot:run
 
-#배송목록 확인
-http http://delivery:8080/deliveries     # 모든 주문의 목록이 조회됨
+#세탁목록 확인 # 모든 주문의 목록이 조회됨
 ```
+![05 pub_sub_세탁서비스수행_LaundryStarted수행됨_1](https://user-images.githubusercontent.com/66341540/105163226-fe7f4200-5b56-11eb-83d9-d2cb1d91312b.JPG)
 
 ```
-고객센터는 주문/배송과 완전히 분리되어있으며, 이벤트 수신에 따라 처리되기 때문에, 고객센터 시스템이 유지보수로 인해 잠시 내려간 상태라도 주문을 받는데 문제가 없다:
-  
+고객센터는 주문/세탁과 완전히 분리되어있으며, 이벤트 수신에 따라 처리되기 때문에, 고객센터 시스템이 유지보수로 인해 잠시 내려간 상태라도 주문을 받는데 문제가 없다:
 ```
 package clothrental;
 
@@ -470,22 +469,7 @@ public interface MypageRepository extends CrudRepository<Mypage, Long> {
 
 }
 
-```
-# 고객센터 서비스 (customercenter) 를 잠시 내려놓음 (ctrl+c)
-
-#주문처리
-http http://order:8080/orders productId=1001 qty=5 status=Order   #Success
-
-#주문목록 확인
-http http://customercenter:8080/mypages    # 모든 주문의 목록이 조회안됨
-
-#고객센터 서비스 기동
-cd customercenter
-mvn spring-boot:run
-
-#주문목록 확인
-http http://customercenter:8080/mypages     # 모든 주문의 목록이 조회됨
-```
+![06 CQRS적용결과](https://user-images.githubusercontent.com/66341540/105163314-1a82e380-5b57-11eb-942a-7c314d8a58c3.JPG)
 
 
 # 운영
