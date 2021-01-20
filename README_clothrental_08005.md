@@ -221,6 +221,8 @@ public interface LaundryRepository extends PagingAndSortingRepository<Laundry, L
 ```
 ![02 pub_sub_세탁서비스중지_Wash수행됨_1](https://user-images.githubusercontent.com/66341540/105147816-0635eb00-5b45-11eb-9519-f70ca9c3fe36.JPG)
 
+![02 pub_sub_세탁서비스중지_Wash수행됨_2](https://user-images.githubusercontent.com/66341540/105166490-d98cce00-5b5a-11eb-9447-4d33d6449ba3.JPG)
+
 ```
 # 세탁 서비스의 세탁 시작 상태 확인
 ```
