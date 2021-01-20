@@ -616,7 +616,7 @@ kubectl autoscale deploy order --min=1 --max=10 --cpu-percent=15
 ```
 siege -c150 -t60S -v --content-type "application/json" 'http://order:8080/orders/1 PATCH {"status": "Delivery Cancelled"}'
 ```
-- 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다:
+- 오토스케일이 어떻게 되고 있는지 모니터링을 걸어둔다: kubectl get hpa 에 대한 캡처가 필요
 ```
 kubectl get deploy order -w
 ```
@@ -628,14 +628,7 @@ kubectl get deploy order -w
 
 * 먼저 무정지 재배포가 100% 되는 것인지 확인하기 위해서 Autoscaler 이나 CB 설정을 제거함
 
-order 에 deployment.yaml 
-```
-          resources:
-            limits:
-              cpu: 500m
-            requests:
-              cpu: 200m
-```
+delivery 에 deployment.yaml readiness probe 없는 상태
 
 - seige 로 배포작업 직전에 워크로드를 모니터링 함.
 ```
