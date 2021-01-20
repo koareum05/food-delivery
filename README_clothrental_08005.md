@@ -454,7 +454,7 @@ mvn spring-boot:run
 
 ```
 고객센터는 주문/세탁과 완전히 분리되어있으며, 이벤트 수신에 따라 처리되기 때문에, 고객센터 시스템이 유지보수로 인해 잠시 내려간 상태라도 주문을 받는데 문제가 없다
-```
+
 package clothrental;
 
 import org.springframework.data.repository.CrudRepository;
@@ -467,7 +467,7 @@ public interface MypageRepository extends CrudRepository<Mypage, Long> {
     List<Mypage> findByOrderId(Long orderId);
 
 }
-
+```
 ![06 CQRS적용결과](https://user-images.githubusercontent.com/66341540/105163314-1a82e380-5b57-11eb-942a-7c314d8a58c3.JPG)
 
 
